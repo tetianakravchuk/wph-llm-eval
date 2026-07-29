@@ -1,0 +1,61 @@
+{
+  "_comment": "Verified reference records from the World Publishing Houses dataset. verification_status separates confirmed public-source facts from curated leads that still need review. This is the golden set the LLM outputs are graded against.",
+  "language_codes": {
+    "da": "Danish",
+    "is": "Icelandic",
+    "nb": "Norwegian Bokmal",
+    "sv": "Swedish",
+    "fi": "Finnish",
+    "uk": "Ukrainian"
+  },
+  "records": [
+    {
+      "id": "wph-001",
+      "work_title": "Hymne til kaerligheden",
+      "author": "Karen Blixen",
+      "original_language": "da",
+      "publisher": "Gyldendal",
+      "country": "Denmark",
+      "translator_en": "Anna Sorensen",
+      "english_availability": "available",
+      "english_publication_year": 1998,
+      "verification_status": "verified_public_source"
+    },
+    {
+      "id": "wph-002",
+      "work_title": "Vetrarborgin",
+      "author": "Arnaldur Indridason",
+      "original_language": "is",
+      "publisher": "Vaka-Helgafell",
+      "country": "Iceland",
+      "translator_en": "Victoria Cribb",
+      "english_availability": "available",
+      "english_publication_year": 2012,
+      "verification_status": "verified_public_source"
+    },
+    {
+      "id": "wph-003",
+      "work_title": "Kaldet",
+      "author": "Ida Jessen",
+      "original_language": "da",
+      "publisher": "Gyldendal",
+      "country": "Denmark",
+      "translator_en": null,
+      "english_availability": "not_yet",
+      "english_publication_year": null,
+      "verification_status": "curated_needs_check"
+    },
+    {
+      "id": "wph-004",
+      "work_title": "Internat",
+      "author": "Serhiy Zhadan",
+      "original_language": "uk",
+      "publisher": "Meridian Czernowitz",
+      "country": "Ukraine",
+      "translator_en": "Reilly Costigan-Humes",
+      "english_availability": "available",
+      "english_publication_year": 2023,
+      "verification_status": "verified_public_source"
+    }
+  ]
+}

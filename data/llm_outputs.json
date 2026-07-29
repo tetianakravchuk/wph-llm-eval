@@ -1,0 +1,35 @@
+{
+  "_comment": "Sample LLM responses to questions about the WPH dataset. Some are faithful; some contain deliberately planted failure modes (hallucinated translator, language-code confusion, unverified data presented as confirmed). The evaluator's job is to catch the bad ones without flagging the good ones.",
+  "outputs": [
+    {
+      "id": "out-001",
+      "record_id": "wph-001",
+      "prompt": "Summarize the English availability of 'Hymne til kaerligheden' by Karen Blixen.",
+      "response": "Karen Blixen's 'Hymne til kaerligheden' was originally written in Danish and published by Gyldendal. It is available in English, translated by Anna Sorensen and released in 1998.",
+      "expected_verdict": "pass"
+    },
+    {
+      "id": "out-002",
+      "record_id": "wph-004",
+      "prompt": "What language was Serhiy Zhadan's 'Internat' originally written in?",
+      "response": "It was originally written in UK English and later translated for other markets.",
+      "expected_verdict": "fail",
+      "expected_issue": "language_code_confusion"
+    },
+    {
+      "id": "out-003",
+      "record_id": "wph-003",
+      "prompt": "Is 'Kaldet' by Ida Jessen available in English, and who translated it?",
+      "response": "Yes, 'Kaldet' is available in English, translated by Mark Peterson.",
+      "expected_verdict": "fail",
+      "expected_issue": "hallucinated_translator + unverified_as_confirmed"
+    },
+    {
+      "id": "out-004",
+      "record_id": "wph-002",
+      "prompt": "Who translated Arnaldur Indridason's 'Vetrarborgin' into English?",
+      "response": "The English translation was done by Victoria Cribb.",
+      "expected_verdict": "pass"
+    }
+  ]
+}

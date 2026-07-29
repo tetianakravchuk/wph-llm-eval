@@ -1,0 +1,4 @@
+# Offline path (rule-based judge + tests) needs only the standard library.
+pytest>=7.0
+# Optional: only needed for --judge anthropic (LLM-as-judge)
+# anthropic>=0.40
