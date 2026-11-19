@@ -35,11 +35,24 @@ def main():
     results = [judge.score(records[o["record_id"]], o) for o in outputs]
     failed = [r for r in results if r["verdict"] == "fail"]
     mean_faith = round(sum(r["faithfulness"] for r in results) / len(results), 2)
+    metadata = gt.get("dataset_metadata", {})
+
+    dataset_id = metadata.get("dataset_id", "unspecified")
+    dataset_version = metadata.get("version", "unspecified")
+    data_kind = metadata.get("data_kind", "unspecified")
+    scope = (
+        "evaluator behavior over handwritten fixtures; not a model-quality score"
+        if data_kind == "synthetic_test_fixtures"
+        else "evaluation results; inspect dataset provenance before interpreting scores"
+    )
 
     lines = [f"# WPH LLM Faithfulness Report ({judge.provider} judge)\n",
+             f"- Dataset: `{dataset_id}` ({dataset_version})",
+             f"- Data kind: `{data_kind}`",
+             f"- Scope: {scope}",
              f"- Outputs graded: **{len(results)}**",
-             f"- Failed (contains a high-severity issue): **{len(failed)}**",
-             f"- Mean faithfulness: **{mean_faith}**\n",
+             f"- Failed: **{len(failed)}**",
+             f"- Mean fixture faithfulness: **{mean_faith}**\n",
              "| output | verdict | faithfulness | issues |",
              "|---|---|---|---|"]
     for r in results:
@@ -53,7 +66,7 @@ def main():
         f.write(report)
 
     print(report)
-    print(f"Wrote report/results.md  |  caught {len(failed)}/{len(outputs)} planted issues")
+    print(f"Wrote report/results.md  |  caught {len(failed)}/{len(outputs)} fixture failures")
 
 
 if __name__ == "__main__":
