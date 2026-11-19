@@ -46,13 +46,15 @@ def main():
         else "evaluation results; inspect dataset provenance before interpreting scores"
     )
 
+    mean_label = "Mean fixture faithfulness" if data_kind == "synthetic_test_fixtures" else "Mean faithfulness"
+
     lines = [f"# WPH LLM Faithfulness Report ({judge.provider} judge)\n",
              f"- Dataset: `{dataset_id}` ({dataset_version})",
              f"- Data kind: `{data_kind}`",
              f"- Scope: {scope}",
              f"- Outputs graded: **{len(results)}**",
              f"- Failed: **{len(failed)}**",
-             f"- Mean fixture faithfulness: **{mean_faith}**\n",
+             f"- {mean_label}: **{mean_faith}**\n",
              "| output | verdict | faithfulness | issues |",
              "|---|---|---|---|"]
     for r in results:
