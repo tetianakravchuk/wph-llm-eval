@@ -1,0 +1,105 @@
+{
+  "dataset_metadata": {
+    "dataset_id": "wph-public-source-prompt-strategy-candidates",
+    "version": "0.1.0",
+    "data_kind": "source_cited_candidate",
+    "scope": "Public bibliographic metadata only; no publisher description or book text is copied.",
+    "approval_status": "pending_project_owner_review",
+    "approval_note": "Sources and field mappings were checked, but the project owner must review and approve these candidate records before they count as the approved golden set.",
+    "curated_at": "2026-11-19",
+    "records": 2,
+    "cases": 2
+  },
+  "records": [
+    {
+      "id": "source-case-001",
+      "work_title": "The Summer Book",
+      "author": "Tove Jansson",
+      "original_language": "Swedish",
+      "english_translators": ["Thomas Teal"],
+      "english_edition_publisher": "New York Review Books",
+      "english_edition_publication_date": "2008-05-20",
+      "source_urls": ["https://www.nyrb.com/products/the-summer-book"],
+      "field_sources": {
+        "work_title": ["https://www.nyrb.com/products/the-summer-book"],
+        "author": ["https://www.nyrb.com/products/the-summer-book"],
+        "original_language": ["https://www.nyrb.com/products/the-summer-book"],
+        "english_translators": ["https://www.nyrb.com/products/the-summer-book"],
+        "english_edition_publisher": ["https://www.nyrb.com/products/the-summer-book"],
+        "english_edition_publication_date": ["https://www.nyrb.com/products/the-summer-book"]
+      },
+      "field_evidence": {
+        "work_title": "NYRB product title is The Summer Book.",
+        "author": "NYRB credits the book to Tove Jansson.",
+        "original_language": "NYRB says the edition is translated from Swedish.",
+        "english_translators": "NYRB credits Thomas Teal as translator from Swedish.",
+        "english_edition_publisher": "The source is the NYRB Classics product page.",
+        "english_edition_publication_date": "NYRB lists May 20, 2008 as the edition publication date."
+      },
+      "provenance": {
+        "source_type": "publisher_catalog",
+        "retrieved_at": "2026-11-19",
+        "copyright_note": "Only factual bibliographic metadata is stored; no descriptive source text is reproduced."
+      },
+      "approval_status": "pending_project_owner_review"
+    },
+    {
+      "id": "source-case-002",
+      "work_title": "The Orphanage",
+      "author": "Serhiy Zhadan",
+      "original_language": "Ukrainian",
+      "english_translators": ["Reilly Costigan-Humes", "Isaac Stackhouse Wheeler"],
+      "english_edition_publisher": "Yale University Press",
+      "english_edition_publication_date": "2021-02-23",
+      "source_urls": [
+        "https://yalebooks.yale.edu/book/9780300243017/the-orphanage/",
+        "https://yalebooks.yale.edu/2021/03/19/the-orphanage/"
+      ],
+      "field_sources": {
+        "work_title": ["https://yalebooks.yale.edu/book/9780300243017/the-orphanage/"],
+        "author": ["https://yalebooks.yale.edu/book/9780300243017/the-orphanage/"],
+        "original_language": ["https://yalebooks.yale.edu/2021/03/19/the-orphanage/"],
+        "english_translators": [
+          "https://yalebooks.yale.edu/book/9780300243017/the-orphanage/",
+          "https://yalebooks.yale.edu/2021/03/19/the-orphanage/"
+        ],
+        "english_edition_publisher": ["https://yalebooks.yale.edu/book/9780300243017/the-orphanage/"],
+        "english_edition_publication_date": ["https://yalebooks.yale.edu/book/9780300243017/the-orphanage/"]
+      },
+      "field_evidence": {
+        "work_title": "The Yale University Press book page gives the title as The Orphanage.",
+        "author": "The Yale University Press book page credits Serhiy Zhadan.",
+        "original_language": "The Yale University Press article says the book was translated from Ukrainian.",
+        "english_translators": "The Yale University Press book page and article credit Reilly Costigan-Humes and Isaac Stackhouse Wheeler.",
+        "english_edition_publisher": "The title is listed on the Yale University Press catalog.",
+        "english_edition_publication_date": "The Yale University Press book page lists February 23, 2021."
+      },
+      "provenance": {
+        "source_type": "publisher_catalog",
+        "retrieved_at": "2026-11-19",
+        "copyright_note": "Only factual bibliographic metadata is stored; no descriptive source text is reproduced."
+      },
+      "approval_status": "pending_project_owner_review"
+    }
+  ],
+  "cases": [
+    {
+      "id": "prompt-case-001",
+      "record_id": "source-case-001",
+      "question": "What is the original language of The Summer Book, and who translated this English edition?",
+      "expected_facts": {
+        "original_language": "Swedish",
+        "english_translators": ["Thomas Teal"]
+      }
+    },
+    {
+      "id": "prompt-case-002",
+      "record_id": "source-case-002",
+      "question": "What is the original language of The Orphanage, and who translated this English edition?",
+      "expected_facts": {
+        "original_language": "Ukrainian",
+        "english_translators": ["Reilly Costigan-Humes", "Isaac Stackhouse Wheeler"]
+      }
+    }
+  ]
+}
