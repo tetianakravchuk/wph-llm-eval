@@ -19,9 +19,15 @@
       "english_translators": ["Thomas Teal"],
       "english_edition_publisher": "New York Review Books",
       "english_edition_publication_date": "2008-05-20",
-      "source_urls": [
-        "https://www.nyrb.com/products/the-summer-book"
-      ],
+      "source_urls": ["https://www.nyrb.com/products/the-summer-book"],
+      "field_sources": {
+        "work_title": ["https://www.nyrb.com/products/the-summer-book"],
+        "author": ["https://www.nyrb.com/products/the-summer-book"],
+        "original_language": ["https://www.nyrb.com/products/the-summer-book"],
+        "english_translators": ["https://www.nyrb.com/products/the-summer-book"],
+        "english_edition_publisher": ["https://www.nyrb.com/products/the-summer-book"],
+        "english_edition_publication_date": ["https://www.nyrb.com/products/the-summer-book"]
+      },
       "field_evidence": {
         "work_title": "NYRB product title is The Summer Book.",
         "author": "NYRB credits the book to Tove Jansson.",
@@ -49,6 +55,17 @@
         "https://yalebooks.yale.edu/book/9780300243017/the-orphanage/",
         "https://yalebooks.yale.edu/2021/03/19/the-orphanage/"
       ],
+      "field_sources": {
+        "work_title": ["https://yalebooks.yale.edu/book/9780300243017/the-orphanage/"],
+        "author": ["https://yalebooks.yale.edu/book/9780300243017/the-orphanage/"],
+        "original_language": ["https://yalebooks.yale.edu/2021/03/19/the-orphanage/"],
+        "english_translators": [
+          "https://yalebooks.yale.edu/book/9780300243017/the-orphanage/",
+          "https://yalebooks.yale.edu/2021/03/19/the-orphanage/"
+        ],
+        "english_edition_publisher": ["https://yalebooks.yale.edu/book/9780300243017/the-orphanage/"],
+        "english_edition_publication_date": ["https://yalebooks.yale.edu/book/9780300243017/the-orphanage/"]
+      },
       "field_evidence": {
         "work_title": "The Yale University Press book page gives the title as The Orphanage.",
         "author": "The Yale University Press book page credits Serhiy Zhadan.",
