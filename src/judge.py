@@ -1,5 +1,5 @@
 """
-Judges turn a (prompt, response, record) into a verdict.
+Judges turn a (prompt, response, fixture record) into a verdict.
 
 - RuleBasedJudge: deterministic, offline, no API key. Uses evaluators.py.
 - LLMJudge (Anthropic): optional. Set ANTHROPIC_API_KEY and pass provider="anthropic"
@@ -14,7 +14,9 @@ import os
 
 from evaluators import evaluate
 
-RUBRIC = """You are grading whether an ANSWER about a book is faithful to a VERIFIED record.
+RUBRIC = """You are grading whether an ANSWER is faithful to the supplied reference fixture.
+The public fixture values are synthetic: treat them as expected values for this test only,
+not as facts about real books, authors, translators, or editions.
 Rules:
 1. Every factual claim (language, translator, publisher, year, English availability)
    must be supported by the record. Unsupported claims are hallucinations.

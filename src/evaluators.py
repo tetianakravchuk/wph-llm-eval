@@ -1,7 +1,8 @@
 """
-Reference-based evaluators for LLM answers about the World Publishing Houses
-dataset. Each answer is graded, facet by facet, against a *verified* ground-truth
-record. Pure standard library -- runs anywhere, no API key.
+Reference-based evaluators for LLM-answer fixtures about World Publishing Houses.
+Each answer is graded, facet by facet, against a supplied test record. The public
+evaluation dataset uses synthetic records; these values are not real-world source claims.
+Pure standard library -- runs anywhere, no API key.
 
 Failure modes checked (the ones that matter for a source-grounded product):
   - hallucinated_translator      : names a translator the record doesn't support
@@ -90,7 +91,7 @@ def check_availability(record, text):
 
 
 def check_verification(record, text):
-    """A curated_needs_check record must not be presented as confirmed fact."""
+    """A fixture marked curated_needs_check must not be presented as confirmed fact."""
     facet = {"facet": "verification", "status": "na", "severity": "info", "detail": ""}
     if record.get("verification_status") != "curated_needs_check":
         return facet

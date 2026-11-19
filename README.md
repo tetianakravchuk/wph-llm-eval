@@ -1,78 +1,80 @@
 # WPH LLM Evaluation
 
-**Source-grounded faithfulness evaluation for LLM answers about the World Publishing Houses dataset.**
+**A small evaluation harness for source-grounded World Publishing Houses answers.**
 
-LLMs are happy to tell you who translated a book, what language it was written in, and whether it's available in English — whether or not any of it is true. This project treats the **verified** World Publishing Houses records as ground truth and grades LLM answers against them, catching the failure modes that actually break a source-backed product: **hallucinated attributions, factual errors, language-code confusion, and unverified data presented as fact.**
+The repository keeps two datasets distinct:
 
-It runs offline with no API key (a deterministic rule-based judge) and has a drop-in seam for LLM-as-judge with Claude.
+- The original four-record harness uses **synthetic fixtures** to demonstrate evaluator behavior. They are not verified WPH records or model-quality results.
+- A two-record, source-cited **prompt-strategy candidate set** is in `data/prompt_strategy_cases.json`. Its fields map to publisher-catalog URLs. It is marked pending project-owner review and is blocked by the live experiment runner until approved.
+
+## Offline fixture harness
 
 ```bash
-python src/run_eval.py            # offline judge, no key needed
-pytest -q                         # the harness's own tests
-python src/run_eval.py --judge anthropic   # LLM-as-judge (needs ANTHROPIC_API_KEY)
+python src/run_eval.py
+pytest -q
+python src/run_eval.py --judge anthropic  # optional LLM judge; needs ANTHROPIC_API_KEY
 ```
 
-## Why this dataset is the right test bed
+The fixture dataset is in [`data/wph_ground_truth.json`](data/wph_ground_truth.json). Each row says `synthetic_fixture`; its empty source URLs are intentional. The four handwritten responses in [`data/llm_outputs.json`](data/llm_outputs.json) include planted failures. Their scores are evaluator smoke-test results, not model-quality metrics.
 
-The WPH dataset already carries a `verification_status` on every record (`verified_public_source` vs `curated_needs_check`) and full provenance. That makes it a **golden set**: I can ask an LLM questions about a book, then check every claim in its answer against a record I trust — and specifically check that it never launders an unverified lead into a confirmed fact.
+## Prompt-strategy experiment
 
-## What it evaluates
+The candidate set contains factual metadata from publisher pages:
 
-Each answer is graded facet-by-facet against its record:
+- [The Summer Book — New York Review Books](https://www.nyrb.com/products/the-summer-book)
+- [The Orphanage — Yale University Press](https://yalebooks.yale.edu/book/9780300243017/the-orphanage/)
+- [Yale University Press source-language and translator note](https://yalebooks.yale.edu/2021/03/19/the-orphanage/)
 
-| Check | Failure it catches |
+Each field has both a source URL and a short evidence note. Only bibliographic facts are stored; publisher descriptions and book text are not copied. The candidate set needs project-owner approval before it is represented as an approved golden set. Review `field_sources` and `field_evidence`, then set the dataset and each record's `approval_status` to `approved_for_evaluation`. The runner blocks by default until then; `--allow-pending-review` creates an explicitly exploratory run.
+
+The live runner compares four prompt patterns using the same cases and model:
+
+- Direct evidence-context prompt
+- Few-shot example prompt
+- ReAct-style prompt with a read-only evidence lookup tool
+- Two-stage extraction and answer prompt chain
+
+It scores requested facts and field-level citations, then records model calls, tokens, latency, and optional cost. It reports paired score differences and bootstrap intervals versus the direct baseline. It requests concise evidence-linked claims; it does not ask for hidden chain-of-thought.
+
+After approval, install the optional Anthropic SDK and set `ANTHROPIC_API_KEY`:
+
+```bash
+python -m pip install anthropic
+python src/run_prompt_comparison.py --model YOUR_ANTHROPIC_MODEL_ID
+```
+
+See [the experiment protocol](docs/prompt-strategy-experiment.md) for data approval, scoring details, limitations, and optional cost inputs.
+
+**This is a smoke-test set of two records.** It can exercise the comparison pipeline and reveal case-level differences, but cannot establish a generally better strategy. Expand the reviewed set and define the sample-size/power approach before making broad comparative claims. The implementation uses custom evaluation code; it does not use RAGAS, LangSmith, or TruLens.
+
+## Original fixture checks
+
+The deterministic rule evaluator checks:
+
+| Check | Example failure |
 |---|---|
-| **Grounding / factual consistency** | claims that contradict the verified record (wrong translator, wrong year) |
-| **Hallucinated attribution** | naming a translator the record doesn't support |
-| **Language-code confusion** | reading ISO `uk` (Ukrainian) as "UK / English" — a real multilingual-metadata bug |
-| **Verification awareness** | presenting a `curated_needs_check` record as a confirmed fact instead of hedging |
+| Grounding | Claim contradicts the fixture record |
+| Hallucinated attribution | Names a translator the fixture does not support |
+| Language-code confusion | Misreads ISO `uk` as “UK / English” |
+| Verification awareness | Presents a simulated unverified record as confirmed |
 
-`faithfulness` is scored over the claims an answer actually makes (a hallucination costs credit; a *mere omission* does not — that's a separate completeness concern). Any high-severity issue makes the whole answer `fail`.
-
-## Example output
-
-```
-# WPH LLM Faithfulness Report (rule judge)
-- Outputs graded: 4
-- Failed (contains a high-severity issue): 2
-- Mean faithfulness: 0.5
-
-| output   | verdict | faithfulness | issues                                                              |
-|----------|---------|--------------|---------------------------------------------------------------------|
-| out-001  | PASS    | 1.0          | -                                                                   |
-| out-002  | FAIL    | 0.0          | language-code confusion: 'uk' means Ukrainian, answer says 'uk english' |
-| out-003  | FAIL    | 0.0          | hallucinated translator 'Mark Peterson'; availability wrong; unverified presented as confirmed |
-| out-004  | PASS    | 1.0          | -                                                                   |
-```
-
-The four sample answers in `data/llm_outputs.json` include two deliberately planted failures; the [`tests`](tests/) assert the evaluator catches them and doesn't false-flag the good ones. A green CI run therefore means *the eval harness works* — which is the whole point.
-
-## The LLM-as-judge upgrade
-
-`src/judge.py` ships two judges behind one interface:
-
-- **`RuleBasedJudge`** (default) — deterministic, offline, cheap enough to gate CI.
-- **`AnthropicJudge`** — sends the same rubric to Claude to grade faithfulness on free-form answers the rule checks can't fully parse. Set `ANTHROPIC_API_KEY`, `pip install anthropic`, and run with `--judge anthropic`.
-
-Using a cheap deterministic judge as a regression gate and an LLM judge for fidelity is the same pattern I'd apply to a production eval suite.
+The [Library of Congress ISO 639 code list](https://www.loc.gov/standards/iso639-2/php/code_list-txt.php) lists `uk` as Ukrainian.
 
 ## Layout
 
 ```
-data/   wph_ground_truth.json   verified records (the golden set)
-        llm_outputs.json        sample LLM answers, incl. planted failures
-src/    evaluators.py           facet checks (grounding, hallucination, codes, verification)
-        judge.py                rule-based + Anthropic judges behind one interface
-        run_eval.py             CLI -> scored report + report/results.md
-tests/  test_evaluators.py      proves the harness catches the planted failures
+data/   wph_ground_truth.json          synthetic evaluator fixtures
+        llm_outputs.json               handwritten fixture answers
+        prompt_strategy_cases.json      source-cited candidate records and cases
+src/    evaluators.py                  deterministic facet checks
+        judge.py                       rule-based + optional Anthropic judges
+        prompt_strategies.py           prompt variants and read-only lookup tool
+        run_eval.py                    offline fixture evaluation
+        run_prompt_comparison.py       live paired strategy experiment
+docs/   prompt-strategy-experiment.md  protocol and limitations
+tests/  test_evaluators.py              fixture behavior checks
 ```
-
-## Roadmap
-
-- Have the LLM *generate* the answers too (currently the answers are fixtures), so the loop is generate → evaluate end to end.
-- Add retrieval so the model must ground answers in provided WPH records (RAG faithfulness).
-- Expand the golden set from the full WPH dataset and track faithfulness over time.
 
 ---
 
-Part of the [World Publishing Houses](https://tetianakravchuk.com/pages/world-publishing-houses.html) work by **Tetiana Kravchuk** — AI QA · LLM Evaluation · Data Quality.
+Part of the [World Publishing Houses](https://tetianakravchuk.com/pages/world-publishing-houses.html) work by **Tetiana Kravchuk** — AI evaluation · data quality.
