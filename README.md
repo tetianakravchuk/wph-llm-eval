@@ -1,78 +1,80 @@
 # WPH LLM Evaluation
 
-**Source-grounded faithfulness evaluation for LLM answers about the World Publishing Houses dataset.**
+**A small, facet-based evaluation harness demonstrated with synthetic fixture data.**
 
-LLMs are happy to tell you who translated a book, what language it was written in, and whether it's available in English — whether or not any of it is true. This project treats the **verified** World Publishing Houses records as ground truth and grades LLM answers against them, catching the failure modes that actually break a source-backed product: **hallucinated attributions, factual errors, language-code confusion, and unverified data presented as fact.**
+The evaluator checks whether a known set of rules catches selected failures in answers about language, translators, availability, and record verification status. The checked-in examples are **fictional fixtures**. They are not verified World Publishing Houses records, real model responses, or evidence of a model's production quality.
 
-It runs offline with no API key (a deterministic rule-based judge) and has a drop-in seam for LLM-as-judge with Claude.
+## Run it
 
 ```bash
-python src/run_eval.py            # offline judge, no key needed
-pytest -q                         # the harness's own tests
-python src/run_eval.py --judge anthropic   # LLM-as-judge (needs ANTHROPIC_API_KEY)
+python src/run_eval.py            # offline rule-based judge, no key needed
+pytest -q                         # run the harness tests
+python src/run_eval.py --judge anthropic   # optional LLM judge (needs ANTHROPIC_API_KEY)
 ```
 
-## Why this dataset is the right test bed
+## Dataset provenance and scope
 
-The WPH dataset already carries a `verification_status` on every record (`verified_public_source` vs `curated_needs_check`) and full provenance. That makes it a **golden set**: I can ask an LLM questions about a book, then check every claim in its answer against a record I trust — and specifically check that it never launders an unverified lead into a confirmed fact.
+The fixture dataset is in [`data/wph_ground_truth.json`](data/wph_ground_truth.json). Its metadata identifies the version, data kind, source policy, and the ISO language-code reference. Each record has a `provenance` object:
 
-## What it evaluates
+- `kind: synthetic_fixture` means the row is fictional.
+- `source_urls` and `field_evidence` are empty because the bibliographic fields are invented for tests.
+- `verification_status_is_simulated: true` means the status is a test condition, not a claim that a real record was verified.
 
-Each answer is graded facet-by-facet against its record:
+The four responses in [`data/llm_outputs.json`](data/llm_outputs.json) are handwritten fixtures. Two contain planted failures. The evaluation report measures how the evaluator handles those fixtures; its scores are **not** model-quality metrics and do not establish facts about real WPH records.
+
+The language-code map follows ISO 639-1. The [Library of Congress ISO 639 code list](https://www.loc.gov/standards/iso639-2/php/code_list-txt.php) lists `uk` as Ukrainian.
+
+## What the evaluator checks
+
+Each fixture answer is graded facet by facet:
 
 | Check | Failure it catches |
 |---|---|
-| **Grounding / factual consistency** | claims that contradict the verified record (wrong translator, wrong year) |
-| **Hallucinated attribution** | naming a translator the record doesn't support |
-| **Language-code confusion** | reading ISO `uk` (Ukrainian) as "UK / English" — a real multilingual-metadata bug |
-| **Verification awareness** | presenting a `curated_needs_check` record as a confirmed fact instead of hedging |
+| **Grounding / factual consistency** | Claims that contradict the fixture record |
+| **Hallucinated attribution** | Naming a translator when the fixture has no verified translator |
+| **Language-code confusion** | Misreading ISO `uk` (Ukrainian) as “UK / English” |
+| **Verification awareness** | Presenting a simulated `curated_needs_check` record as confirmed |
 
-`faithfulness` is scored over the claims an answer actually makes (a hallucination costs credit; a *mere omission* does not — that's a separate completeness concern). Any high-severity issue makes the whole answer `fail`.
+`faithfulness` is scored over claims the answer actually makes: an incorrect claim costs credit; omission is treated as a separate completeness concern. Any high-severity issue makes the fixture answer fail.
 
 ## Example output
 
 ```
 # WPH LLM Faithfulness Report (rule judge)
+- Dataset: wph-llm-eval-synthetic-fixtures (1.0.0)
+- Data kind: synthetic_test_fixtures
+- Scope: evaluator behavior over handwritten fixtures; not a model-quality score
 - Outputs graded: 4
-- Failed (contains a high-severity issue): 2
-- Mean faithfulness: 0.5
-
-| output   | verdict | faithfulness | issues                                                              |
-|----------|---------|--------------|---------------------------------------------------------------------|
-| out-001  | PASS    | 1.0          | -                                                                   |
-| out-002  | FAIL    | 0.0          | language-code confusion: 'uk' means Ukrainian, answer says 'uk english' |
-| out-003  | FAIL    | 0.0          | hallucinated translator 'Mark Peterson'; availability wrong; unverified presented as confirmed |
-| out-004  | PASS    | 1.0          | -                                                                   |
+- Failed: 2
+- Mean fixture faithfulness: 0.5
 ```
 
-The four sample answers in `data/llm_outputs.json` include two deliberately planted failures; the [`tests`](tests/) assert the evaluator catches them and doesn't false-flag the good ones. A green CI run therefore means *the eval harness works* — which is the whole point.
+The mean is only a summary of these four hand-authored cases. It should not be compared across models or reported as a production success rate.
 
-## The LLM-as-judge upgrade
+## Rule-based and LLM judges
 
 `src/judge.py` ships two judges behind one interface:
 
-- **`RuleBasedJudge`** (default) — deterministic, offline, cheap enough to gate CI.
-- **`AnthropicJudge`** — sends the same rubric to Claude to grade faithfulness on free-form answers the rule checks can't fully parse. Set `ANTHROPIC_API_KEY`, `pip install anthropic`, and run with `--judge anthropic`.
+- **`RuleBasedJudge`** — deterministic, offline, and suitable for demonstrating a CI gate.
+- **`AnthropicJudge`** — optional Claude-based scoring for free-form answers.
 
-Using a cheap deterministic judge as a regression gate and an LLM judge for fidelity is the same pattern I'd apply to a production eval suite.
+The rule judge tests explicit patterns; it does not independently establish truth. The LLM judge is exercised on the same handwritten fixtures and should also be treated as a harness demonstration, not a model benchmark.
 
 ## Layout
 
 ```
-data/   wph_ground_truth.json   verified records (the golden set)
-        llm_outputs.json        sample LLM answers, incl. planted failures
-src/    evaluators.py           facet checks (grounding, hallucination, codes, verification)
-        judge.py                rule-based + Anthropic judges behind one interface
+data/   wph_ground_truth.json   synthetic records and provenance metadata
+        llm_outputs.json        handwritten answers, including planted failures
+src/    evaluators.py           facet checks
+        judge.py                rule-based + Anthropic judges
         run_eval.py             CLI -> scored report + report/results.md
-tests/  test_evaluators.py      proves the harness catches the planted failures
+tests/  test_evaluators.py      checks fixture verdicts and planted failures
 ```
 
-## Roadmap
+## Next step for real WPH evaluation
 
-- Have the LLM *generate* the answers too (currently the answers are fixtures), so the loop is generate → evaluate end to end.
-- Add retrieval so the model must ground answers in provided WPH records (RAG faithfulness).
-- Expand the golden set from the full WPH dataset and track faithfulness over time.
+Before treating any catalog data as a real golden set, replace or supplement these fixtures with a small, shareable, source-checked dataset. Include record-level source URLs and field-level evidence for every evaluated claim, the verification date, and the dataset/license provenance. Then connect the evaluator to actual generated answers and retrieval context.
 
 ---
 
-Part of the [World Publishing Houses](https://tetianakravchuk.com/pages/world-publishing-houses.html) work by **Tetiana Kravchuk** — AI QA · LLM Evaluation · Data Quality.
+Part of the [World Publishing Houses](https://tetianakravchuk.com/pages/world-publishing-houses.html) work by **Tetiana Kravchuk** — AI evaluation · data quality.
