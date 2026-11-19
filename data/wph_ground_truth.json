@@ -1,5 +1,17 @@
 {
-  "_comment": "Verified reference records from the World Publishing Houses dataset. verification_status separates confirmed public-source facts from curated leads that still need review. This is the golden set the LLM outputs are graded against.",
+  "_comment": "Synthetic evaluation fixtures only. These rows are not real bibliographic records and must not be cited as facts about real books.",
+  "dataset_metadata": {
+    "dataset_id": "wph-llm-eval-synthetic-fixtures",
+    "version": "1.0.0",
+    "data_kind": "synthetic_test_fixtures",
+    "record_count": 4,
+    "real_world_bibliographic_claims": false,
+    "source_policy": "All titles, authors, publishers, translators, countries, years, and record verification states are fictional test values. No record-level external sources apply.",
+    "language_code_reference": {
+      "standard": "ISO 639-1",
+      "source_url": "https://www.loc.gov/standards/iso639-2/php/code_list-txt.php"
+    }
+  },
   "language_codes": {
     "da": "Danish",
     "is": "Icelandic",
@@ -10,52 +22,84 @@
   },
   "records": [
     {
-      "id": "wph-001",
-      "work_title": "Hymne til kaerligheden",
-      "author": "Karen Blixen",
+      "id": "fixture-001",
+      "work_title": "Example Work A",
+      "author": "Example Author A",
       "original_language": "da",
-      "publisher": "Gyldendal",
+      "publisher": "Example Press A",
       "country": "Denmark",
-      "translator_en": "Anna Sorensen",
+      "translator_en": "Example Translator A",
       "english_availability": "available",
       "english_publication_year": 1998,
-      "verification_status": "verified_public_source"
+      "verification_status": "verified_public_source",
+      "provenance": {
+        "kind": "synthetic_fixture",
+        "source_urls": [],
+        "field_evidence": {},
+        "real_world_record": false,
+        "verification_status_is_simulated": true,
+        "note": "Every bibliographic value is fictional. The verification status only simulates an application state for evaluator testing."
+      }
     },
     {
-      "id": "wph-002",
-      "work_title": "Vetrarborgin",
-      "author": "Arnaldur Indridason",
+      "id": "fixture-002",
+      "work_title": "Example Work B",
+      "author": "Example Author B",
       "original_language": "is",
-      "publisher": "Vaka-Helgafell",
+      "publisher": "Example Press B",
       "country": "Iceland",
-      "translator_en": "Victoria Cribb",
+      "translator_en": "Example Translator B",
       "english_availability": "available",
       "english_publication_year": 2012,
-      "verification_status": "verified_public_source"
+      "verification_status": "verified_public_source",
+      "provenance": {
+        "kind": "synthetic_fixture",
+        "source_urls": [],
+        "field_evidence": {},
+        "real_world_record": false,
+        "verification_status_is_simulated": true,
+        "note": "Every bibliographic value is fictional. The verification status only simulates an application state for evaluator testing."
+      }
     },
     {
-      "id": "wph-003",
-      "work_title": "Kaldet",
-      "author": "Ida Jessen",
+      "id": "fixture-003",
+      "work_title": "Example Work C",
+      "author": "Example Author C",
       "original_language": "da",
-      "publisher": "Gyldendal",
+      "publisher": "Example Press C",
       "country": "Denmark",
       "translator_en": null,
       "english_availability": "not_yet",
       "english_publication_year": null,
-      "verification_status": "curated_needs_check"
+      "verification_status": "curated_needs_check",
+      "provenance": {
+        "kind": "synthetic_fixture",
+        "source_urls": [],
+        "field_evidence": {},
+        "real_world_record": false,
+        "verification_status_is_simulated": true,
+        "note": "Every bibliographic value is fictional. The missing translator and review-needed status simulate an uncertain record for evaluator testing."
+      }
     },
     {
-      "id": "wph-004",
-      "work_title": "Internat",
-      "author": "Serhiy Zhadan",
+      "id": "fixture-004",
+      "work_title": "Example Work D",
+      "author": "Example Author D",
       "original_language": "uk",
-      "publisher": "Meridian Czernowitz",
+      "publisher": "Example Press D",
       "country": "Ukraine",
-      "translator_en": "Reilly Costigan-Humes",
+      "translator_en": "Example Translator D",
       "english_availability": "available",
       "english_publication_year": 2023,
-      "verification_status": "verified_public_source"
+      "verification_status": "verified_public_source",
+      "provenance": {
+        "kind": "synthetic_fixture",
+        "source_urls": [],
+        "field_evidence": {},
+        "real_world_record": false,
+        "verification_status_is_simulated": true,
+        "note": "Every bibliographic value is fictional. The valid language code is used only to exercise the language-code confusion rule."
+      }
     }
   ]
 }
