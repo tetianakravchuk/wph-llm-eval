@@ -24,16 +24,19 @@ from prompt_strategies import (  # noqa: E402
 )
 
 ROOT = Path(__file__).resolve().parents[1]
+STRATEGY_ORDER_SEED = 1701
 
 
 def parse_json(text):
     try:
-        return json.loads(text)
+        parsed = json.loads(text)
+        return parsed if isinstance(parsed, dict) else {"answer": str(parsed), "claims": []}
     except json.JSONDecodeError:
         start, end = text.find("{"), text.rfind("}")
         if start >= 0 and end > start:
             try:
-                return json.loads(text[start:end + 1])
+                parsed = json.loads(text[start:end + 1])
+                return parsed if isinstance(parsed, dict) else {"answer": str(parsed), "claims": []}
             except json.JSONDecodeError:
                 pass
     return {"answer": text, "claims": []}
@@ -44,6 +47,8 @@ def normalized(value):
 
 
 def score_response(case, record, payload):
+    if not isinstance(payload, dict):
+        payload = {"answer": str(payload), "claims": []}
     answer = str(payload.get("answer", ""))
     claims = payload.get("claims", [])
     if not isinstance(claims, list):
@@ -238,8 +243,13 @@ def main():
     client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
     cases = dataset["cases"]
     results = []
-    for strategy in STRATEGIES:
-        for case in cases:
+    order_rng = random.Random(STRATEGY_ORDER_SEED)
+    run_sequence = 0
+    for case in cases:
+        case_strategy_order = list(STRATEGIES)
+        order_rng.shuffle(case_strategy_order)
+        for strategy in case_strategy_order:
+            run_sequence += 1
             record = records[case["record_id"]]
             raw, payload, usage, prompt_material = run_case(
                 client, args.model, strategy, case, record, cases, records
@@ -253,6 +263,7 @@ def main():
                     8,
                 )
             results.append({
+                "run_sequence": run_sequence,
                 "case_id": case["id"],
                 "record_id": record["id"],
                 "strategy": strategy,
@@ -266,22 +277,21 @@ def main():
             })
 
     baseline = [row for row in results if row["strategy"] == "direct"]
+    baseline_by_case = {row["case_id"]: row["quality_score"] for row in baseline}
     summary = {}
     for strategy in STRATEGIES:
         rows = [row for row in results if row["strategy"] == strategy]
         scores = [row["quality_score"] for row in rows]
+        differences = [
+            row["quality_score"] - baseline_by_case[row["case_id"]]
+            for row in rows if row["case_id"] in baseline_by_case
+        ]
         summary[strategy] = {
             "cases": len(rows),
             "mean_quality_score": round(statistics.mean(scores), 4) if scores else None,
             "bootstrap_95_percent_interval": bootstrap_interval(scores),
             "paired_quality_difference_vs_direct": (
-                0.0 if strategy == "direct"
-                else round(statistics.mean([
-                    row["quality_score"] - {
-                        base["case_id"]: base["quality_score"] for base in baseline
-                    }[row["case_id"]]
-                    for row in rows
-                ]), 4)
+                0.0 if strategy == "direct" else round(statistics.mean(differences), 4)
             ),
             "paired_difference_95_percent_interval_vs_direct": (
                 [0.0, 0.0] if strategy == "direct"
@@ -306,6 +316,7 @@ def main():
             "approval_override_used": bool(args.allow_pending_review and pending),
             "model": args.model,
             "temperature": 0,
+            "strategy_order_seed": STRATEGY_ORDER_SEED,
             "strategies": list(STRATEGIES),
             "scoring": {
                 "quality_score": "0.7 * field accuracy + 0.3 * citation coverage",
@@ -316,6 +327,7 @@ def main():
             "limitations": [
                 "Two source records are a smoke-test set, not enough for a reliable winner or broad model claim.",
                 "Prompt variants are compared on one model at temperature 0; this does not establish generality across models.",
+                "One run per case/strategy is exploratory; repeat stochastic generations before drawing conclusions.",
                 "Estimated cost is null unless both per-million token prices are supplied explicitly.",
                 "Approval-pending runs must be labeled exploratory and must not be reported as approved-set results."
             ],
