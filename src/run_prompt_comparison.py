@@ -46,7 +46,12 @@ def normalized(value):
 def score_response(case, record, payload):
     answer = str(payload.get("answer", ""))
     claims = payload.get("claims", [])
-    combined = normalized(answer + " " + " ".join(str(c.get("value", "")) for c in claims))
+    if not isinstance(claims, list):
+        claims = []
+    claim_values = " ".join(
+        str(claim.get("value", "")) for claim in claims if isinstance(claim, dict)
+    )
+    combined = normalized(answer + " " + claim_values)
     expected = case["expected_facts"]
     correct_fields = 0
     for field, expected_value in expected.items():
@@ -55,13 +60,26 @@ def score_response(case, record, payload):
             correct_fields += 1
     fact_accuracy = correct_fields / max(len(expected), 1)
 
-    valid_sources = set(record["source_urls"])
-    cited_claims = [
-        claim for claim in claims
-        if isinstance(claim, dict) and claim.get("source_url") in valid_sources
-    ]
-    citation_coverage = len(cited_claims) / max(len(claims), 1)
-    unsupported_claims = max(0, len(claims) - len(cited_claims))
+    field_sources = record.get("field_sources", {})
+    accurate_citations = []
+    for claim in claims:
+        if not isinstance(claim, dict):
+            continue
+        field = claim.get("field")
+        allowed_sources = field_sources.get(field, [])
+        expected_value = expected.get(field)
+        if expected_value is None:
+            continue
+        expected_values = expected_value if isinstance(expected_value, list) else [expected_value]
+        claim_value = normalized(claim.get("value", ""))
+        value_matches = any(
+            normalized(value) and normalized(value) in claim_value
+            for value in expected_values
+        )
+        if claim.get("source_url") in allowed_sources and value_matches:
+            accurate_citations.append(claim)
+    citation_coverage = len(accurate_citations) / max(len(claims), 1)
+    unsupported_claims = max(0, len(claims) - len(accurate_citations))
     score = round(0.7 * fact_accuracy + 0.3 * citation_coverage, 4)
     return {
         "fact_accuracy": round(fact_accuracy, 4),
@@ -72,7 +90,11 @@ def score_response(case, record, payload):
 
 
 def _text_blocks(response):
-    return "\n".join(getattr(block, "text", "") for block in response.content if getattr(block, "type", "") == "text")
+    return "\n".join(
+        getattr(block, "text", "")
+        for block in response.content
+        if getattr(block, "type", "") == "text"
+    )
 
 
 def call_text(client, model, prompt):
@@ -93,7 +115,8 @@ def call_text(client, model, prompt):
 
 
 def call_react(client, model, case, record):
-    messages = [{"role": "user", "content": user_prompt("react", case, record)}]
+    first_prompt = user_prompt("react", case, record)
+    messages = [{"role": "user", "content": first_prompt}]
     total = {"calls": 0, "latency_ms": 0.0, "input_tokens": 0, "output_tokens": 0}
     for _ in range(4):
         start = time.perf_counter()
@@ -109,10 +132,13 @@ def call_react(client, model, case, record):
         total["calls"] += 1
         total["input_tokens"] += response.usage.input_tokens
         total["output_tokens"] += response.usage.output_tokens
-        tool_uses = [block for block in response.content if getattr(block, "type", "") == "tool_use"]
+        tool_uses = [
+            block for block in response.content
+            if getattr(block, "type", "") == "tool_use"
+        ]
         if not tool_uses:
             total["latency_ms"] = round(total["latency_ms"], 2)
-            return _text_blocks(response), total
+            return _text_blocks(response), total, first_prompt
         messages.append({"role": "assistant", "content": response.content})
         results = []
         for block in tool_uses:
@@ -122,22 +148,28 @@ def call_react(client, model, case, record):
                 if requested_id == record["id"]
                 else json.dumps({"error": "record_id is outside this evaluation case"})
             )
-            results.append({"type": "tool_result", "tool_use_id": block.id, "content": result})
+            results.append({
+                "type": "tool_result",
+                "tool_use_id": block.id,
+                "content": result,
+            })
         messages.append({"role": "user", "content": results})
     raise RuntimeError(f"ReAct tool-call limit reached for {case['id']}")
 
 
 def run_case(client, model, strategy, case, record, cases, records):
     if strategy == "react":
-        raw, usage = call_react(client, model, case, record)
+        raw, usage, prompt_material = call_react(client, model, case, record)
         payload = parse_json(raw)
     elif strategy == "chain":
         extraction_prompt = user_prompt("chain", case, record)
         extracted_raw, first_usage = call_text(client, model, extraction_prompt)
         extracted = parse_json(extracted_raw)
-        final_raw, second_usage = call_text(client, model, final_chain_prompt(case, extracted))
+        final_prompt = final_chain_prompt(case, extracted)
+        final_raw, second_usage = call_text(client, model, final_prompt)
         payload = parse_json(final_raw)
         raw = final_raw
+        prompt_material = extraction_prompt + "\n---CHAIN STAGE 2---\n" + final_prompt
         usage = {
             "calls": first_usage["calls"] + second_usage["calls"],
             "latency_ms": round(first_usage["latency_ms"] + second_usage["latency_ms"], 2),
@@ -146,30 +178,39 @@ def run_case(client, model, strategy, case, record, cases, records):
         }
     else:
         demo = demonstration_for(record, cases, records) if strategy == "few_shot" else None
-        prompt = user_prompt(strategy, case, record, demo)
-        raw, usage = call_text(client, model, prompt)
+        prompt_material = user_prompt(strategy, case, record, demo)
+        raw, usage = call_text(client, model, prompt_material)
         payload = parse_json(raw)
-    return raw, payload, usage
+    return raw, payload, usage, prompt_material
 
 
 def bootstrap_interval(values, seed=17, rounds=2000):
     if not values:
         return [None, None]
     rng = random.Random(seed)
-    means = [
-        statistics.mean(rng.choices(values, k=len(values)))
-        for _ in range(rounds)
-    ]
+    means = [statistics.mean(rng.choices(values, k=len(values))) for _ in range(rounds)]
     means.sort()
-    return [round(means[int(0.025 * rounds)], 4), round(means[int(0.975 * rounds)], 4)]
+    return [
+        round(means[int(0.025 * rounds)], 4),
+        round(means[min(int(0.975 * rounds), rounds - 1)], 4),
+    ]
+
+
+def paired_bootstrap_interval(candidate, baseline, seed=17, rounds=2000):
+    baseline_by_case = {row["case_id"]: row["quality_score"] for row in baseline}
+    differences = [
+        row["quality_score"] - baseline_by_case[row["case_id"]]
+        for row in candidate if row["case_id"] in baseline_by_case
+    ]
+    return bootstrap_interval(differences, seed=seed, rounds=rounds)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", default=str(ROOT / "data/prompt_strategy_cases.json"))
-    parser.add_argument("--model", required=True, help="Anthropic model ID; use the same ID for every strategy")
+    parser.add_argument("--model", required=True, help="Anthropic model ID; same ID for every strategy")
     parser.add_argument("--allow-pending-review", action="store_true",
-                        help="Run a clearly labeled exploratory comparison before owner approval")
+                        help="Run an explicitly exploratory comparison before owner approval")
     parser.add_argument("--input-price-per-million", type=float)
     parser.add_argument("--output-price-per-million", type=float)
     parser.add_argument("--output", default=str(ROOT / "report/prompt_strategy_comparison.json"))
@@ -179,8 +220,10 @@ def main():
     metadata = dataset["dataset_metadata"]
     approval = metadata.get("approval_status", "missing")
     records = {record["id"]: record for record in dataset["records"]}
-    pending = [record["id"] for record in dataset["records"]
-               if record.get("approval_status") != "approved_for_evaluation"]
+    pending = [
+        record["id"] for record in dataset["records"]
+        if record.get("approval_status") != "approved_for_evaluation"
+    ]
     if (approval != "approved_for_evaluation" or pending) and not args.allow_pending_review:
         raise SystemExit(
             "Dataset is not approved. Review the cited records, set dataset and record "
@@ -198,27 +241,23 @@ def main():
     for strategy in STRATEGIES:
         for case in cases:
             record = records[case["record_id"]]
-            raw, payload, usage = run_case(
+            raw, payload, usage, prompt_material = run_case(
                 client, args.model, strategy, case, record, cases, records
             )
             score = score_response(case, record, payload)
-            input_price = args.input_price_per_million
-            output_price = args.output_price_per_million
             cost = None
-            if input_price is not None and output_price is not None:
+            if args.input_price_per_million is not None and args.output_price_per_million is not None:
                 cost = round(
-                    usage["input_tokens"] * input_price / 1_000_000
-                    + usage["output_tokens"] * output_price / 1_000_000, 8
+                    usage["input_tokens"] * args.input_price_per_million / 1_000_000
+                    + usage["output_tokens"] * args.output_price_per_million / 1_000_000,
+                    8,
                 )
-            prompt_fingerprint = hashlib.sha256(
-                f"{strategy}|{case['id']}|{args.model}".encode("utf-8")
-            ).hexdigest()
             results.append({
                 "case_id": case["id"],
                 "record_id": record["id"],
                 "strategy": strategy,
                 "model": args.model,
-                "prompt_fingerprint": prompt_fingerprint,
+                "prompt_sha256": hashlib.sha256(prompt_material.encode("utf-8")).hexdigest(),
                 "raw_response": raw,
                 "parsed_response": payload,
                 **score,
@@ -226,6 +265,7 @@ def main():
                 "estimated_cost_usd": cost,
             })
 
+    baseline = [row for row in results if row["strategy"] == "direct"]
     summary = {}
     for strategy in STRATEGIES:
         rows = [row for row in results if row["strategy"] == strategy]
@@ -234,6 +274,19 @@ def main():
             "cases": len(rows),
             "mean_quality_score": round(statistics.mean(scores), 4) if scores else None,
             "bootstrap_95_percent_interval": bootstrap_interval(scores),
+            "paired_quality_difference_vs_direct": (
+                0.0 if strategy == "direct"
+                else round(statistics.mean([
+                    row["quality_score"] - {
+                        base["case_id"]: base["quality_score"] for base in baseline
+                    }[row["case_id"]]
+                    for row in rows
+                ]), 4)
+            ),
+            "paired_difference_95_percent_interval_vs_direct": (
+                [0.0, 0.0] if strategy == "direct"
+                else paired_bootstrap_interval(rows, baseline)
+            ),
             "mean_fact_accuracy": round(statistics.mean(r["fact_accuracy"] for r in rows), 4),
             "mean_citation_coverage": round(statistics.mean(r["citation_coverage"] for r in rows), 4),
             "mean_latency_ms": round(statistics.mean(r["latency_ms"] for r in rows), 2),
@@ -257,8 +310,8 @@ def main():
             "scoring": {
                 "quality_score": "0.7 * field accuracy + 0.3 * citation coverage",
                 "field_accuracy": "all expected values for a field must appear in answer or claims",
-                "citation_coverage": "claims with a URL present in that record's source_urls / all claims",
-                "interval": "percentile bootstrap over case-level scores; exploratory with this small set",
+                "citation_coverage": "claims with a citation URL allowed for that exact field and a matching expected value / all claims",
+                "interval": "paired percentile bootstrap over case-level score differences versus direct",
             },
             "limitations": [
                 "Two source records are a smoke-test set, not enough for a reliable winner or broad model claim.",
