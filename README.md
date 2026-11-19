@@ -1,79 +1,79 @@
 # WPH LLM Evaluation
 
-**A small, facet-based evaluation harness demonstrated with synthetic fixture data.**
+**A small evaluation harness for source-grounded World Publishing Houses answers.**
 
-The evaluator checks whether a known set of rules catches selected failures in answers about language, translators, availability, and record verification status. The checked-in examples are **fictional fixtures**. They are not verified World Publishing Houses records, real model responses, or evidence of a model's production quality.
+The repository keeps two datasets distinct:
 
-## Run it
+- The original four-record harness uses **synthetic fixtures** to demonstrate evaluator behavior. They are not verified WPH records or model-quality results.
+- A two-record, source-cited **prompt-strategy candidate set** is in `data/prompt_strategy_cases.json`. Its fields map to publisher-catalog URLs. It is marked pending project-owner review and is blocked by the live experiment runner until approved.
+
+## Offline fixture harness
 
 ```bash
-python src/run_eval.py            # offline rule-based judge, no key needed
-pytest -q                         # run the harness tests
-python src/run_eval.py --judge anthropic   # optional LLM judge (needs ANTHROPIC_API_KEY)
+python src/run_eval.py
+pytest -q
+python src/run_eval.py --judge anthropic  # optional LLM judge; needs ANTHROPIC_API_KEY
 ```
 
-## Dataset provenance and scope
+The fixture dataset is in [`data/wph_ground_truth.json`](data/wph_ground_truth.json). Each row says `synthetic_fixture`; its empty source URLs are intentional. The four handwritten responses in [`data/llm_outputs.json`](data/llm_outputs.json) include planted failures. Their scores are evaluator smoke-test results, not model-quality metrics.
 
-The fixture dataset is in [`data/wph_ground_truth.json`](data/wph_ground_truth.json). Its metadata identifies the version, data kind, source policy, and the ISO language-code reference. Each record has a `provenance` object:
+## Prompt-strategy experiment
 
-- `kind: synthetic_fixture` means the row is fictional.
-- `source_urls` and `field_evidence` are empty because the bibliographic fields are invented for tests.
-- `verification_status_is_simulated: true` means the status is a test condition, not a claim that a real record was verified.
+The candidate set contains factual metadata from publisher pages:
 
-The four responses in [`data/llm_outputs.json`](data/llm_outputs.json) are handwritten fixtures. Two contain planted failures. The evaluation report measures how the evaluator handles those fixtures; its scores are **not** model-quality metrics and do not establish facts about real WPH records.
+- [The Summer Book — New York Review Books](https://www.nyrb.com/products/the-summer-book)
+- [The Orphanage — Yale University Press](https://yalebooks.yale.edu/book/9780300243017/the-orphanage/)
+- [Yale University Press source-language and translator note](https://yalebooks.yale.edu/2021/03/19/the-orphanage/)
 
-The language-code map follows ISO 639-1. The [Library of Congress ISO 639 code list](https://www.loc.gov/standards/iso639-2/php/code_list-txt.php) lists `uk` as Ukrainian.
+Each field has both a source URL and a short evidence note. Only bibliographic facts are stored; publisher descriptions and book text are not copied. The candidate set needs project-owner approval before it is represented as an approved golden set. Review `field_sources` and `field_evidence`, then set the dataset and each record's `approval_status` to `approved_for_evaluation`. The runner blocks by default until then; `--allow-pending-review` creates an explicitly exploratory run.
 
-## What the evaluator checks
+The live runner compares four prompt patterns using the same cases and model:
 
-Each fixture answer is graded facet by facet:
+- Direct evidence-context prompt
+- Few-shot example prompt
+- ReAct-style prompt with a read-only evidence lookup tool
+- Two-stage extraction and answer prompt chain
 
-| Check | Failure it catches |
+It scores requested facts and field-level citations, then records model calls, tokens, latency, and optional cost. It reports paired score differences and bootstrap intervals versus the direct baseline. It requests concise evidence-linked claims; it does not ask for hidden chain-of-thought.
+
+After approval, install the optional Anthropic SDK and set `ANTHROPIC_API_KEY`:
+
+```bash
+python -m pip install anthropic
+python src/run_prompt_comparison.py --model YOUR_ANTHROPIC_MODEL_ID
+```
+
+See [the experiment protocol](docs/prompt-strategy-experiment.md) for data approval, scoring details, limitations, and optional cost inputs.
+
+**This is a smoke-test set of two records.** It can exercise the comparison pipeline and reveal case-level differences, but cannot establish a generally better strategy. Expand the reviewed set and define the sample-size/power approach before making broad comparative claims. The implementation uses custom evaluation code; it does not use RAGAS, LangSmith, or TruLens.
+
+## Original fixture checks
+
+The deterministic rule evaluator checks:
+
+| Check | Example failure |
 |---|---|
-| **Grounding / factual consistency** | Claims that contradict the fixture record |
-| **Hallucinated attribution** | Naming a translator when the fixture has no verified translator |
-| **Language-code confusion** | Misreading ISO `uk` (Ukrainian) as “UK / English” |
-| **Verification awareness** | Presenting a simulated `curated_needs_check` record as confirmed |
+| Grounding | Claim contradicts the fixture record |
+| Hallucinated attribution | Names a translator the fixture does not support |
+| Language-code confusion | Misreads ISO `uk` as “UK / English” |
+| Verification awareness | Presents a simulated unverified record as confirmed |
 
-`faithfulness` is scored over claims the answer actually makes: an incorrect claim costs credit; omission is treated as a separate completeness concern. Any high-severity issue makes the fixture answer fail.
-
-## Example output
-
-```
-# WPH LLM Faithfulness Report (rule judge)
-- Dataset: wph-llm-eval-synthetic-fixtures (1.0.0)
-- Data kind: synthetic_test_fixtures
-- Scope: evaluator behavior over handwritten fixtures; not a model-quality score
-- Outputs graded: 4
-- Failed: 2
-- Mean fixture faithfulness: 0.5
-```
-
-The mean is only a summary of these four hand-authored cases. It should not be compared across models or reported as a production success rate.
-
-## Rule-based and LLM judges
-
-`src/judge.py` ships two judges behind one interface:
-
-- **`RuleBasedJudge`** — deterministic, offline, and suitable for demonstrating a CI gate.
-- **`AnthropicJudge`** — optional Claude-based scoring for free-form answers.
-
-The rule judge tests explicit patterns; it does not independently establish truth. The LLM judge is exercised on the same handwritten fixtures and should also be treated as a harness demonstration, not a model benchmark.
+The [Library of Congress ISO 639 code list](https://www.loc.gov/standards/iso639-2/php/code_list-txt.php) lists `uk` as Ukrainian.
 
 ## Layout
 
 ```
-data/   wph_ground_truth.json   synthetic records and provenance metadata
-        llm_outputs.json        handwritten answers, including planted failures
-src/    evaluators.py           facet checks
-        judge.py                rule-based + Anthropic judges
-        run_eval.py             CLI -> scored report + report/results.md
-tests/  test_evaluators.py      checks fixture verdicts and planted failures
+data/   wph_ground_truth.json          synthetic evaluator fixtures
+        llm_outputs.json               handwritten fixture answers
+        prompt_strategy_cases.json      source-cited candidate records and cases
+src/    evaluators.py                  deterministic facet checks
+        judge.py                       rule-based + optional Anthropic judges
+        prompt_strategies.py           prompt variants and read-only lookup tool
+        run_eval.py                    offline fixture evaluation
+        run_prompt_comparison.py       live paired strategy experiment
+docs/   prompt-strategy-experiment.md  protocol and limitations
+tests/  test_evaluators.py              fixture behavior checks
 ```
-
-## Next step for real WPH evaluation
-
-Before treating any catalog data as a real golden set, replace or supplement these fixtures with a small, shareable, source-checked dataset. Include record-level source URLs and field-level evidence for every evaluated claim, the verification date, and the dataset/license provenance. Then connect the evaluator to actual generated answers and retrieval context.
 
 ---
 
