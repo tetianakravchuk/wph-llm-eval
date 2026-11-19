@@ -7,7 +7,8 @@
     "approval_status": "pending_project_owner_review",
     "approval_note": "Sources and field mappings were checked, but the project owner must review and approve these candidate records before they count as the approved golden set.",
     "curated_at": "2026-11-19",
-    "records": 2
+    "records": 2,
+    "cases": 2
   },
   "records": [
     {
@@ -62,6 +63,26 @@
         "copyright_note": "Only factual bibliographic metadata is stored; no descriptive source text is reproduced."
       },
       "approval_status": "pending_project_owner_review"
+    }
+  ],
+  "cases": [
+    {
+      "id": "prompt-case-001",
+      "record_id": "source-case-001",
+      "question": "What is the original language of The Summer Book, and who translated this English edition?",
+      "expected_facts": {
+        "original_language": "Swedish",
+        "english_translators": ["Thomas Teal"]
+      }
+    },
+    {
+      "id": "prompt-case-002",
+      "record_id": "source-case-002",
+      "question": "What is the original language of The Orphanage, and who translated this English edition?",
+      "expected_facts": {
+        "original_language": "Ukrainian",
+        "english_translators": ["Reilly Costigan-Humes", "Isaac Stackhouse Wheeler"]
+      }
     }
   ]
 }
